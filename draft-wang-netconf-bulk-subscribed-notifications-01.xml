@@ -1,0 +1,602 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<!-- This template is for creating an Internet Draft using xml2rfc,               
+    which is available here: http://xml.resource.org. -->
+<!DOCTYPE rfc SYSTEM "rfc2629.dtd" [
+<!-- One method to get references from the online citation libraries.             
+    There has to be one entity for each item to be referenced.                    
+    An alternate method (rfc include) is described in the references. -->
+<!ENTITY RFC2119 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.2119.xml">
+<!ENTITY RFC2697 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.2697.xml">
+<!ENTITY RFC2698 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.2698.xml">
+<!ENTITY RFC6020 SYSTEM "http://xml.resource.org/public/rfc/bibxml/reference.RFC.6020.xml">
+]>
+<?xml-stylesheet type='text/xsl' href='rfc2629.xslt' ?>
+<?rfc toc="yes" ?>
+<?rfc tocompact="yes"?>
+<?rfc tocindent="yes"?>
+<?rfc symrefs="yes" ?>
+<?rfc sortrefs="yes"?>
+<?rfc iprnotified="no" ?>
+<?rfc strict="yes" ?>
+<?rfc compact="yes"?>
+<?rfc subcompact="no"?>
+<rfc category="std"
+     docName="draft-wang-netconf-bulk-subscribed-notifications-01"
+     ipr="trust200902">
+  <front>
+    <title abbrev="Bulk Subscription">Bulk Subscription to YANG Event
+    Notification</title>
+
+    <author fullname="Michael Wang" initials="Z." surname="Wang">
+      <organization>Huawei</organization>
+
+      <address>
+        <postal>
+          <street>101 Software Avenue, Yuhua District</street>
+
+          <city>Nanjing</city>
+
+          <region>Jiangsu</region>
+
+          <code>210012</code>
+
+          <country>China</country>
+        </postal>
+
+        <email>wangzitao@huawei.com</email>
+      </address>
+    </author>
+
+    <author fullname="Qin Wu" initials="Q." surname="Wu">
+      <organization>Huawei</organization>
+
+      <address>
+        <postal>
+          <street>101 Software Avenue, Yuhua District</street>
+
+          <city>Nanjing</city>
+
+          <region>Jiangsu</region>
+
+          <code>210012</code>
+
+          <country>China</country>
+        </postal>
+
+        <email>bill.wu@huawei.com</email>
+      </address>
+    </author>
+
+    <author fullname="Peng Liu" initials="P." surname="Liu">
+      <organization>China Mobile</organization>
+
+      <address>
+        <postal>
+          <street>32 Xuanwumen West St, Xicheng District</street>
+
+          <city>Beijing</city>
+
+          <code>10053</code>
+        </postal>
+
+        <email>liupengyjy@chinamobile.com</email>
+      </address>
+    </author>
+
+    <author fullname="Hui Cai" initials="H." surname="Cai">
+      <organization>China Mobile</organization>
+
+      <address>
+        <postal>
+          <street>32 Xuanwumen West St, Xicheng District</street>
+
+          <city>Beijing</city>
+
+          <code>10053</code>
+        </postal>
+
+        <email>caihui@chinamobile.com</email>
+      </address>
+    </author>
+
+    <date year="2020"/>
+
+    <area>OPS Area</area>
+
+    <workgroup>NETCONF Working Group</workgroup>
+
+    <abstract>
+      <t>This document defines a YANG data model and associated mechanism that
+      allows subscriber applications to bulk subscribe to publishers' event
+      streams based on group identifier. This allows the publishers to report
+      multiple notifications in a single bundling message.</t>
+    </abstract>
+  </front>
+
+  <middle>
+    <section anchor="intro" title="Introduction">
+      <t>The Subscription to YANG Notifications specification [RFC8639] uses a
+      "stream" name in subscription protocol operation for identifying the
+      targeted event stream against which the subscription is applied and
+      supports multiple subscriptions on a single transport session.
+      Notification Message Headers and Bundles
+      [I-D.ietf-netconf-notification-messages] allows multiple notifications
+      bundled into one transportable message. However the subscription
+      protocol operation doesn't provide specific criteria to classify
+      subscriptions and therefore lacks the capability to explicitly indicate
+      which specific subscription associated with the notification should be
+      bundled together,e.g., subscription A and B are bundled based on their
+      relationship with a set of YANG data models while subscription C and D
+      are bundled based on "transport" and "encoding" parameters,both bundled
+      groups are transported in the same transport session. A group identifier
+      associated with a set of subscriptions or YANG data models enables the
+      ability to perform encapsulation operation on a set of subscriptions
+      with common characteristics via a single transaction. The group
+      identifier provides a more optimal mechanism for notification
+      encapsulation which would otherwise require multiple atomic transactions
+      on a per subscription (i.e., one message per notification) basis.
+      Following are some of the use-cases where such identifier can be
+      used.<list style="symbols">
+          <t>For a dynamic subscription, the subscriber may have already had
+          priori knowledge about correlation relation between
+          subscriptions(e.g., aggregated subscribed data from multiple
+          sources). With this priori knowledge,it might send a bundle
+          subscription RPC request to indicate what specific notifications
+          associated with the subscription must be bundled together.</t>
+
+          <t>For a configured subscription, self-explanation data Node tag
+          capability advertisment describing correlation between data nodes in
+          different YANG data model from different publisher can be used to
+          further establish correlation relation between subscriptions. The
+          correlation relation between subscriptions can be configured back
+          onto publisher, which help determine which notifications can be
+          bundles and which notifications are not.</t>
+
+          <t>With the above bundle subscription indication from subscription
+          to the publisher, multiple notifications corresponding to the
+          request protocol operation for those notifications are bundled into
+          one transportable message using Notification Message Headers and
+          Bundles defined in [I-D.ietf-netconf-notification-messages].</t>
+        </list></t>
+
+      <t>This document defines a YANG data model and associated mechanism that
+      classify subscription based on various different filtering criteria and
+      allow subscriber applications to bulk subscribe/unsubscribe to
+      publishers' event streams based on group identifier. This allows the
+      publishers to report multiple notification in a single bundling message
+      defined in [I-D.ietf-netconf-notification-messages].</t>
+
+      <section title="Terminology">
+        <t>The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT",
+        "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and
+        "OPTIONAL" in this document are to be interpreted as described in BCP
+        14 [RFC2119] [RFC8174] when, and only when, they appear in all
+        capitals, as shown here.</t>
+
+        <t>This document uses the following terms:<list style="hanging">
+            <t hangText="Event:">Something that happens which may be of
+            interest or trigger the invocation of the rule. A fault, an alarm,
+            a change in network state, network security threat, hardware
+            malfunction, buffer untilization crossing a threshold, network
+            connection setup, an external input to the system, for example
+            [RFC3877].</t>
+
+            <t hangText="Client:">Defined in [RFC8342].</t>
+
+            <t hangText="Configuration: ">Defined in [RFC8342].</t>
+
+            <t hangText="Configured subscription:">Defined in [RFC8639]</t>
+
+            <t hangText="Configuration datastore:  ">Defined in [RFC8342].</t>
+
+            <t hangText="Event record: ">A set of information detailing an
+            event [RFC8639].</t>
+
+            <t hangText="Event stream: ">A continuous, chronologically ordered
+            set of events aggregated under some context [RFC8639].</t>
+
+            <t hangText="Notification message: ">Information intended for a
+            receiver indicating that one or more events have occurred
+            [RFC8639].</t>
+
+            <t hangText="Publisher:">An entity responsible for streaming
+            notification messages per the terms of a subscription
+            [RFC8639].</t>
+
+            <t hangText="Receiver:">A target to which a publisher pushes
+            subscribed event records. For dynamic subscriptions, the receiver
+            and subscriber are the same entity [RFC8639].</t>
+
+            <t hangText="Subscriber: ">A client able to request and negotiate
+            a contract for the generation and push of event records from a
+            publisher. For dynamic subscriptions, the receiver and subscriber
+            are the same entity [RFC8639].</t>
+
+            <t hangText="Subscription:">A contract with a publisher,
+            stipulating the information that one or more receivers wish to
+            have pushed from the publisher without the need for further
+            solicitation [RFC8639].</t>
+          </list></t>
+      </section>
+    </section>
+
+    <!-- intro -->
+
+    <section title="Model Overview">
+      <t>The YANG data model for the Bulk Subscriptions to YANG Event
+      Notification has been split into two modules:<list style="symbols">
+          <t>The ietf-bulk-subscription.yang module defines a list for
+          classifying different subscriptions corresponding to event streams
+          into groups. Each group is associated with a group identifier and a
+          set of subscriptions. A set of subscription is identified by a
+          "group-id" string. This string is used both as an index within the
+          bulk subscription module. It associate a specific bundle group with
+          a group of subscriptions and a set of YANG data models, as shown in
+          the subscription augmentation. In
+          addition,ietf-subscribed-notifications.yang module defined in
+          [RFC8639] is augmented with "max-bundle-latency" and
+          "compression-algorithm" to enhance QoS feature and provide
+          additional subscription bundle classification criteria.</t>
+
+          <t>The ietf-bulk-notification.yang module augment the YANG structure
+          of ietf-notification-messages.yang
+          [draft-ietf-netconf-notification-messages], a "group-id" is added to
+          the "message-header" of the ietf-notification-messages.yang to
+          indicate the group to which a set of notifications belongs. In
+          addition, "compression-algorithm" parameer is augmented to
+          "message-header" to inform the corresponding recievers of
+          compression algorithm to be used by the publisher.</t>
+        </list></t>
+
+      <t>The following tree diagrams [RFC8340] provide an overview of the data
+      model for "ietf-bulk-subscription.yang" module and the
+      "ietf-bulk-notification.yang" module.</t>
+
+      <figure>
+        <artwork>module: ietf-bulk-subscription
+  +--rw bundle-groups
+     +--rw bundle-group* [group-id]
+        +--rw group-id    string
+        +--rw subscription-id*     leafref 
+        +--rw yang-module*         yang:yang-identifier 
+  
+  augment /sn:subscriptions/sn:subscription:
+     +--rw max-bundle-latency      uint32
+     +--rw compression-algorithm  string   
+  +---x bundle-subscription
+     +---input
+        +---w group-id?        -&gt; /bundle-groups/bundle-group/group-id
+        +---w max-bundle-latency      uint32
+        +---w compression-algorithm   string
+        +---w subscription-id*        subscription-id
+        +---w masked-subscription-id* subscription-id
+
+module: ietf-bulk-notification
+     augment-structure /nm:message/nm:message-header:
+        +--rw group-id?    string
+        +--rw compression-algorithm string</artwork>
+      </figure>
+    </section>
+
+    <section title="Bulk Subscription YANG Module">
+      <figure>
+        <artwork>  &lt;CODE BEGINS&gt; file "ietf-bulk-subscription@2019-09-23.yang"
+module ietf-bulk-subscription {
+  yang-version 1.1;
+  namespace "urn:ietf:params:xml:ns:yang:ietf-bulk-subscription";
+  prefix bs;
+
+  import ietf-subscribed-notifications {
+    prefix sn;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization
+    "IETF NETCONF (Network Configuration) Working Group";
+  contact
+    "";
+  description
+    "NETCONF Protocol Data Types and Protocol Operations.
+
+     Copyright (c) 2011 IETF Trust and the persons identified as
+     the document authors.  All rights reserved.
+
+     Redistribution and use in source and binary forms, with or
+     without modification, is permitted pursuant to, and subject
+     to the license terms contained in, the Simplified BSD License
+     set forth in Section 4.c of the IETF Trust's Legal Provisions
+     Relating to IETF Documents
+     (http://trustee.ietf.org/license-info).
+
+     This version of this YANG module is part of RFC 6241; see
+     the RFC itself for full legal notices.";
+
+  revision 2019-09-23 {
+    description
+      "Initial revision";
+       reference "RFC XXXX: Bulk Subscription to YANG Event Notification";
+  }
+  identity encode-cbor {
+    base sn:encoding;
+    description
+      "Encode data using cbor.";
+  }
+  identity encode-gpb {
+    base sn:encoding;
+    description
+      "Encode data using gpb.";
+  }
+  container bundle-groups {
+    list bundle-group {
+      key "group-id";
+      leaf group-id {
+        type string;
+        description
+          "This group ID is used as an index within the bulk subscription module
+           , which indicates subscription classification criteria.";
+      }
+      leaf-list subscription-id {
+        type leafref {
+         path "/sn:subscriptions/sn:subscription/sn:id";
+        }
+        description
+          "subscription-id";
+      }
+    leaf-list yang-module {
+      type yang:yang-identifier;
+      description
+        "Name of the YANG module list supported by the publisher.";
+    }
+      description
+        "List for group that classify different subscriptions into groups.";
+    }
+    leaf compression-algorithm {
+      type string;
+      description
+        "The technology with which an originator compress bytestream 
+         contents.";
+    }
+    description
+      "Container for subscription group.";
+  }
+  augment "/sn:subscriptions/sn:subscription" {
+      leaf max-bundle-latency {
+      type uint32;
+      units centiseconds;
+      default 400;
+      description
+      "The maximum latency before a specific YANG Notifications generated 
+       must egress a publisher.";  
+     }
+    leaf compression-algorithm {
+      type string;
+      description
+        "The technology with which an originator compress bytestream 
+         contents.";
+    }
+    description
+      "Augment the subscribed-notifications module with transport specific inforamtion.";
+  }
+
+  rpc bundle-subscription {
+   description
+    "Bundle subscription. This paremeter indicates what subscription must be bundled together.";   
+    input {
+     leaf group-id {
+      type string;
+      description
+      "This group ID is used as an index within the bulk subscription module";
+      }
+    leaf-list subscription-id {
+      type uint32;
+      description
+       "Subscription-id paremeter indicates what subscription must be bundled together.";
+      }
+   leaf-list mask-subscription-id {
+      type uint32;
+      description
+       "Mask subscription-id paremeter indicates what subscription must 
+        not be bundled together.";
+      } 
+     leaf max-bundle-latency {
+      type uint32;
+      units centiseconds;
+      default 400;
+      description
+      "The maximum latency before a specific YANG Notifications generated 
+       must egress a publisher.";  
+     }
+    leaf compression-algorithm {
+      type string;
+      description
+        "The technology with which an originator compress bytestream 
+         contents.";
+    }
+    }
+  }
+}
+&lt;CODE ENDS&gt;</artwork>
+      </figure>
+    </section>
+
+    <section title="Bulk Notification YANG Module">
+      <figure>
+        <artwork>&lt;CODE BEGINS&gt; file "ietf-bulk-notification@2019-09-23.yang"
+module ietf-bulk-notification {
+  yang-version 1.1;
+  namespace "urn:ietf:params:xml:ns:yang:ietf-bulk-notification";
+  prefix bn;
+
+  import ietf-yang-structure-ext {
+    prefix sx;
+  }
+  import ietf-notification-messages {
+    prefix nm;
+  }
+
+  organization
+    "IETF NETCONF (Network Configuration) Working Group";
+  contact
+    "";
+  description
+    "NETCONF Protocol Data Types and Protocol Operations.
+
+     Copyright (c) 2011 IETF Trust and the persons identified as
+     the document authors.  All rights reserved.
+
+     Redistribution and use in source and binary forms, with or
+     without modification, is permitted pursuant to, and subject
+     to the license terms contained in, the Simplified BSD License
+     set forth in Section 4.c of the IETF Trust's Legal Provisions
+     Relating to IETF Documents
+     (http://trustee.ietf.org/license-info).
+
+     This version of this YANG module is part of RFC 6241; see
+     the RFC itself for full legal notices.";
+
+  revision 2019-09-23 {
+    description
+      "Initial revision";
+    reference
+      "RFC XXXX: Bulk Subscription to YANG Event Notification";
+  }
+
+  sx:augment-structure "/nm:message/nm:message-header" {
+     leaf group-id {
+      type string;
+      description
+        "To identify the group to which a set of notifications belongs.";
+    }
+    leaf compression-algorithm {
+      type string;
+      description
+        "The technology with which an originator compress bytestream 
+         contents.";
+    }
+    description
+      "Group related informations are added to the 'message-header' of 
+       the ietf-notification-messages to identify the group to which a 
+       set of notifications belongs." and compression algorithms used by
+       the publisher.;
+  }
+}
+&lt;CODE ENDS&gt;</artwork>
+      </figure>
+    </section>
+
+    <section title="IANA Considerations">
+      <section anchor="xml" title="Updates to the IETF XML Registry">
+        <t>This document registers two URIs in the IETF XML registry
+        [RFC3688]. Following the format in [RFC3688], the following
+        registrations are requested to be made:</t>
+
+        <figure>
+          <artwork>   ---------------------------------------------------------------------
+      URI: urn:ietf:params:xml:ns:yang:ietf-bulk-subscription
+      Registrant Contact: The IESG.
+      XML: N/A, the requested URI is an XML namespace.
+
+      URI: urn:ietf:params:xml:ns:yang:ietf-bulk-notification
+      Registrant Contact: The IESG.
+      XML: N/A, the requested URI is an XML namespace.
+   ---------------------------------------------------------------------</artwork>
+        </figure>
+      </section>
+
+      <section anchor="module"
+               title="Updates to the YANG Module Names Registry">
+        <t>This document registers two YANG modules in the YANG Module Names
+        registry [RFC7950]. . Following the format in [RFC6020], the following
+        registration has been made:</t>
+
+        <figure>
+          <artwork>   ---------------------------------------------------------------------
+      Name:         ietf-bulk-subscription
+      Namespace:    urn:ietf:params:xml:ns:yang:ietf-bulk-subscription
+      Prefix:       trig
+      Reference:    RFC xxxx
+
+      Name:         ietf-bulk-notification
+      Namespace:    urn:ietf:params:xml:ns:yang:ietf-bulk-notification
+      Prefix:       evt
+      Reference:    RFC xxxx
+   ---------------------------------------------------------------------</artwork>
+        </figure>
+      </section>
+    </section>
+
+    <section anchor="security" title="Security Considerations">
+      <t>The YANG module specified in this document defines a schema for data
+      that is designed to be accessed via network management protocols such as
+      NETCONF [RFC6241] or RESTCONF [RFC8040]. The lowest NETCONF layer is the
+      secure transport layer, and the mandatory-to-implement secure transport
+      is Secure Shell (SSH) [RFC6242]. The lowest RESTCONF layer is HTTPS, and
+      the mandatory-to-implement secure transport is TLS [RFC8446].</t>
+
+      <t>The NETCONF Configuration Access Control Model (NACM) [RFC8341]
+      provides the means to restrict access for particular NETCONF or RESTCONF
+      users to a preconfigured subset of all available NETCONF or RESTCONF
+      protocol operations and content.</t>
+
+      <t>There are a number of data nodes defined in this YANG module that are
+      writable/creatable/deletable (i.e., config true, which is the default).
+      These data nodes may be considered sensitive in some network
+      environments. Write operations (e.g., edit-config) to these data nodes
+      without proper protection can have a negative effect on network
+      operations. These are the subtrees and data nodes and their
+      sensitivity/vulnerability:<list style="symbols">
+          <t>/groups/group/group-id</t>
+
+          <t>/groups/group/stream</t>
+
+          <t>/sn:subscriptions/sn:subscription/sn:target/sn:stream/bs:group-id</t>
+
+          <t>sn:establish-subscription/sn:input/sn:target/sn:stream
+          /bs:group-id</t>
+        </list></t>
+    </section>
+
+    <section title="Acknowledgements">
+      <t>Thanks to Eric Voit for reviewing this draft and providing important
+      input to this document.</t>
+    </section>
+
+    <!---->
+  </middle>
+
+  <back>
+    <references title="Normative References">
+      <?rfc include="reference.RFC.2119.xml"?>
+
+      <?rfc include="reference.RFC.8174.xml"?>
+
+      <?rfc include="reference.RFC.7950.xml"?>
+
+      <?rfc include="reference.RFC.8342.xml"?>
+
+      <?rfc include="reference.RFC.8407.xml"?>
+
+      <?rfc include="reference.RFC.8126.xml"?>
+
+      <?rfc include="reference.RFC.8040.xml"?>
+
+      <?rfc include="reference.RFC.6241.xml"?>
+
+      <?rfc include="reference.RFC.6242.xml"?>
+
+      <?rfc include="reference.RFC.8341.xml"?>
+
+      <?rfc include="reference.RFC.8446.xml"?>
+    </references>
+
+    <references title="Informative References">
+      <?rfc include="reference.RFC.3688.xml"?>
+
+      <?rfc include="reference.RFC.6020.xml"?>
+
+      <?rfc include="reference.RFC.8340.xml"?>
+    </references>
+  </back>
+</rfc>
